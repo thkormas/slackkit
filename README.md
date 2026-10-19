@@ -47,14 +47,35 @@ sudo ./scripts/slackware_clean_old_kernels_JBs.sh
 Flags: `-u/--update` (default on), `--no-update`, `-n/--dry-run`, `-y/--yes`,
 `--keep N`, `-h/--help`.
 
-## Testing
+### `scripts/speedup_swappiness_JBs.sh` (v1.0.0)
 
-The script ships with a mock-based harness (fake `slackpkg`, `flatpak`,
-`removepkg`, `grub2-mkconfig`) — no root or real Slackware needed:
+Speed module #1 — sets `vm.swappiness = 6` on Slackware, both ways:
+
+1. **persistent** — `vm.swappiness = 6` in `/etc/sysctl.conf` (what
+   `/etc/rc.d/rc.sysctl` reads at boot on Slackware's sysvinit — no systemd
+   needed), replacing any existing `vm.swappiness` line, with a timestamped
+   backup first
+2. **runtime** — `sysctl -w vm.swappiness=6` so it applies immediately
+3. verifies both levels by reading them back
 
 ```bash
-cd scripts && bash test_clean_old_kernels.sh
-# == ΣΥΝΟΛΟ: 44 ok, 0 FAIL ==
+sudo ./scripts/speedup_swappiness_JBs.sh           # set to 6 (default)
+sudo ./scripts/speedup_swappiness_JBs.sh --value 10  # other value
+./scripts/speedup_swappiness_JBs.sh -s             # show current state
+./scripts/speedup_swappiness_JBs.sh -n             # dry-run
+```
+
+Flags: `--value N` (0-200), `-n/--dry-run`, `-s/--show`, `-h/--help`.
+
+## Testing
+
+Both scripts ship with a mock-based harness (fake `slackpkg`, `flatpak`,
+`removepkg`, `grub2-mkconfig`, `sysctl`) — no root or real Slackware needed:
+
+```bash
+cd scripts
+bash test_clean_old_kernels.sh   # == ΣΥΝΟΛΟ: 44 ok, 0 FAIL ==
+bash test_speedup_swappiness.sh  # == ΣΥΝΟΛΟ: 27 ok, 0 FAIL ==
 ```
 
 ## Roadmap
@@ -62,7 +83,7 @@ cd scripts && bash test_clean_old_kernels.sh
 - [ ] `slackkit` CLI skeleton (subcommands: `install`, `config`, `speed`,
       `maintain`)
 - [ ] `maintain`: wrap the kernel/update script as `slackkit maintain`
-- [ ] `speed`: GRUB timeout, sysctl tuning, service audit
+- [ ] `speed`: GRUB timeout, service audit (sysctl swappiness ✅ ships now)
 - [ ] `install`: package profiles + post-install essentials
 - [ ] `config`: profile-based dotfiles and hardware setup
 - [ ] dry-run everywhere, rollback/safety checks, unified notifications
