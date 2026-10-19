@@ -99,7 +99,7 @@ run() { # $@ = επιλογές
 echo "== TEST 1: dry-run δείχνει plan χωρίς αλλαγές =="
 setup_pkgs; setup_boot
 STUB_KEEP="6.6.10"
-out=$(run -n 2>&1); rc=$?
+out=$(run -n --keep 1 2>&1); rc=$?
 check "dry-run exit 0" "$rc"
 echo "$out" | grep -q "6.1.9"
 check "dry-run αναφέρει dead εκδόσεις" $?
@@ -113,7 +113,7 @@ grep -q "removepkg\|slackpkg \|flatpak \|grub2-mkconfig " "$STUB_LOG"
 echo "== TEST 2: --no-update πλήρης εκτέλεση αφαιρεί παλιούς + ενημερώνει GRUB =="
 setup_pkgs; setup_boot
 STUB_KEEP="6.6.10"
-run -y --no-update >/dev/null 2>&1; rc=$?
+run -y --no-update --keep 1 >/dev/null 2>&1; rc=$?
 check "εκτέλεση exit 0" "$rc"
 grep -q "removepkg kernel-huge-6.1.9" "$STUB_LOG"
 check "removepkg για kernel-huge-6.1.9" $?
@@ -142,7 +142,7 @@ echo "== TEST 3: ο τρέχωντας (παλιός) πυρήνας προστ�
 setup_pkgs; setup_boot
 STUB_UNAME_R="6.1.9-smp"   # τρέχει ο πιο παλιός → πρέπει να κρατηθεί
 STUB_KEEP="6.6.10"
-run -y --no-update >/dev/null 2>&1; rc=$?
+run -y --no-update --keep 1 >/dev/null 2>&1; rc=$?
 check "εκτέλεση exit 0" "$rc"
 grep -q "removepkg.*6\.1\.9" "$STUB_LOG"
 [ $? -ne 0 ]; check "ΔΕΝ αφαιρεί τον τρέχοντα πυρήνα 6.1.9 (smp)" $?
@@ -185,7 +185,7 @@ echo "grub2-mkconfig FAIL $*" >>"$STUB_LOG"
 exit 1
 EOF
 chmod +x "$BIN/grub2-mkconfig"
-run -y --no-update >/dev/null 2>&1; rc=$?
+run -y --no-update --keep 1 >/dev/null 2>&1; rc=$?
 [ "$rc" -ne 0 ]; check "exit != 0 όταν αποτυχάνει το grub2-mkconfig" $?
 # επαναφορά του καλού stub
 cat >"$BIN/grub2-mkconfig" <<'EOF'
@@ -203,7 +203,7 @@ chmod +x "$BIN/grub2-mkconfig"
 echo "== TEST 7: default (με update) τρέχει slackpkg+flatpak και μετά καθαρισμό =="
 setup_pkgs; setup_boot
 STUB_KEEP="6.6.10"
-run -y >/dev/null 2>&1; rc=$?
+run -y --keep 1 >/dev/null 2>&1; rc=$?
 check "exit 0" "$rc"
 grep -q "^slackpkg -batch=on update$" "$STUB_LOG"
 check "τράπηκε slackpkg -batch=on update" $?
@@ -223,7 +223,7 @@ echo "== TEST 8: αποτυχία slackpkg → συνέχεια καθαρισμ
 setup_pkgs; setup_boot
 STUB_KEEP="6.6.10"
 STUB_SLPKG_RC=1
-run -y >/dev/null 2>&1; rc=$?
+run -y --keep 1 >/dev/null 2>&1; rc=$?
 [ "$rc" -ne 0 ]; check "exit != 0 όταν αποτυχάνει το slackpkg" $?
 grep -q "removepkg kernel-huge-6.1.9" "$STUB_LOG"
 check "ο καθαρισμός συνεχίζει παρόλη την αποτυχία ενημέρωσης" $?
@@ -258,6 +258,31 @@ grep -q "removepkg.*6\.1\.10" "$STUB_LOG"
 [ $? -ne 0 ]; check "με --keep 2 κρατάει τον 6.1.10" $?
 grep -q "removepkg.*6\.1\.9" "$STUB_LOG"
 check "με --keep 2 αφαιρεί τον 6.1.9" $?
+
+# ---------------------------------------------------------------- TEST 13 ----
+echo "== TEST 13: default τώρα κρατάει 3 πυρήνες =="
+setup_pkgs; setup_boot
+# +2 ακόμα εκδόσεις: 6.6.9, 6.12.1, 6.12.2 -> 5 συνολικά
+for v in 6.6.9 6.12.1 6.12.2; do
+	mkpkg "kernel-generic-$v-x86_64-1"
+	mkpkg "kernel-huge-$v-x86_64-1"
+	mkpkg "kernel-modules-$v-x86_64-1"
+done
+STUB_UNAME_R="6.12.2"
+STUB_KEEP="6.12.2"
+out=$(run -y --no-update 2>&1); rc=$?
+check "exit 0" "$rc"
+grep -q "removepkg.*6\.1\.9" "$STUB_LOG"
+check "default (3) αφαιρεί τον πιο παλιό 6.1.9" $?
+grep -q "removepkg.*6\.1\.10" "$STUB_LOG"
+check "default (3) αφαιρεί και τον 6.1.10" $?
+grep -q "removepkg.*6\.6\.9" "$STUB_LOG"
+check "default (3) αφαιρεί και τον 6.6.9" $?
+grep -q "removepkg.*6\.6\.10" "$STUB_LOG"
+[ $? -ne 0 ]; check "default (3) κρατάει τον 6.6.10" $?
+grep -q "removepkg.*6\.12" "$STUB_LOG"
+[ $? -ne 0 ]; check "default (3) κρατάει τους 6.12.x" $?
+STUB_UNAME_R="6.6.10"
 
 echo
 echo "== ΣΥΝΟΛΟ: $pass ok, $fail FAIL =="

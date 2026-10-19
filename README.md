@@ -30,8 +30,9 @@ The first building block — system update + old kernel cleanup + GRUB sync:
    kernels and always shows the new one
 
 Safety: `-n/--dry-run` previews everything without changes, `-y` for
-unattended (cron) runs, the running kernel is never removed, and step
-failures are counted and reported (non-zero exit) without aborting the rest.
+unattended (cron) runs, the running kernel is never removed (keeps the
+newest **3** versions by default, `--keep N`), and step failures are
+counted and reported (non-zero exit) without aborting the rest.
 
 ```bash
 # preview
@@ -67,6 +68,46 @@ sudo ./scripts/speedup_swappiness_JBs.sh --value 10  # other value
 
 Flags: `--value N` (0-200), `-n/--dry-run`, `-s/--show`, `-h/--help`.
 
+### `scripts/install_grub_JBs.sh` (v1.0.0)
+
+Automatic GRUB install for **both BIOS and UEFI** — auto-detects boot mode
+(`/sys/firmware/efi`) and the target disk (findmnt/lsblk), **asks before
+changing anything**, installs with `grub2-install` (x86_64-efi or
+i386-pcbios), regenerates `grub.cfg` with a backup and verifies the menu.
+Flags: `-n`, `-y`, `--uefi/--bios`, `--disk DEV`.
+
+### `scripts/setup_slackware_mirror_JBs.sh` (v1.0.0)
+
+Greek mirrors for slackpkg with **one question at the start: stable 15.0 or
+current**. Uses the official Greek mirrors (ΦΠΑ Κρήτης `ftp.cc.uoc.gr`,
+ΕΜΠ `ftp.ntua.gr`), backs up `/etc/slackpkg/mirrors`, comments old active
+entries and runs `slackpkg update`. Flags: `--stable/--current`,
+`--mirror uoc|ntua|official`, `--arch`, `--no-update`, `-n`, `-y`.
+
+### `scripts/install_sbo_tools_JBs.sh` (v1.0.0)
+
+SlackBuilds.org tooling: **sbopkg** (official prebuilt), **sbotools** and
+**slpkg** (via `sbopkg -i` after sync), with **one question at the start:
+SBo branch stable or current** (written to `/etc/sbopkg/sbopkg.conf`). Also
+sets up **faster compilation**: `/etc/profile.d/slackkit-makeflags.sh` with
+`MAKEFLAGS`/`NUMJOBS=-j$(nproc)` (+ ccache PATH when present, `--ccache` to
+install it). Flags: `--stable/--current`, `--no-sync`, `--ccache`, `-n`, `-y`.
+
+### `scripts/enable_sudo_JBs.sh` (v1.0.0)
+
+Automatic sudo enablement for a user (what we did by hand in the VM):
+uncomment `%wheel` in `/etc/sudoers`, add `/etc/sudoers.d/slackkit`, add the
+user to `wheel` — with backup and mandatory `visudo -c` validation (auto
+rollback if validation fails). Asks for the username once at the start.
+
+### `scripts/setup_gui_JBs.sh` (v1.0.0)
+
+Graphical environment after installation: detects installed DEs (Plasma,
+KDE, Xfce, MATE, Cinnamon, Openbox, i3, dwm, fluxbox), asks **once at the
+start** whether to boot straight into GUI (`/etc/inittab` id:3→id:4, with
+backup) or stay on console (`startx`), and writes `~/.xinitrc` for the
+chosen DE. Flags: `--boot/--console`, `--de NAME`, `-n`, `-y`.
+
 ## Testing
 
 Both scripts ship with a mock-based harness (fake `slackpkg`, `flatpak`,
@@ -74,17 +115,26 @@ Both scripts ship with a mock-based harness (fake `slackpkg`, `flatpak`,
 
 ```bash
 cd scripts
-bash test_clean_old_kernels.sh   # == ΣΥΝΟΛΟ: 44 ok, 0 FAIL ==
-bash test_speedup_swappiness.sh  # == ΣΥΝΟΛΟ: 27 ok, 0 FAIL ==
+bash test_clean_old_kernels.sh        # 50 ok, 0 FAIL
+bash test_speedup_swappiness.sh       # 27 ok, 0 FAIL
+bash test_install_grub.sh             # 30 ok, 0 FAIL
+bash test_setup_slackware_mirror.sh   # 27 ok, 0 FAIL
+bash test_install_sbo_tools.sh        # 30 ok, 0 FAIL
+bash test_enable_sudo.sh              # 19 ok, 0 FAIL
+bash test_setup_gui.sh                # 23 ok, 0 FAIL
+# ΣΥΝΟΛΟ: 206 checks, 0 FAIL
 ```
+
+All suites also pass on a **real Slackware 15.0** (KVM VM, see `vm/`):
 
 ## Roadmap
 
 - [ ] `slackkit` CLI skeleton (subcommands: `install`, `config`, `speed`,
       `maintain`)
 - [ ] `maintain`: wrap the kernel/update script as `slackkit maintain`
-- [ ] `speed`: GRUB timeout, service audit (sysctl swappiness ✅ ships now)
-- [ ] `install`: package profiles + post-install essentials
+- [ ] `speed`: GRUB timeout, service audit (swappiness ✅ ships now)
+- [x] `install`: GRUB (BIOS+UEFI) ✅, sudo ✅, GUI ✅, mirrors ✅, SBo tools ✅
+- [ ] `install`: package profiles + codecs/fonts
 - [ ] `config`: profile-based dotfiles and hardware setup
 - [ ] dry-run everywhere, rollback/safety checks, unified notifications
 
