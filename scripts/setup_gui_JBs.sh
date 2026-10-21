@@ -242,7 +242,7 @@ if [ "$BOOT_GUI" = yes ]; then
 		fail "δεν βρέθηκε γραμμή id:3/4 στο $INITTAB_FILE"
 	fi
 else
-	info "runlevel μένει 3 (console) - χρήση startx για GUI"
+	info "το inittab δεν άλλαξε (console mode) - χρήση startx για GUI"
 fi
 
 # --- σύνοψη -------------------------------------------------------------------

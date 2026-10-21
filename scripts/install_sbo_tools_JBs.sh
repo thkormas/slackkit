@@ -9,7 +9,7 @@
 #
 # Τι κάνει:
 #   1. sbopkg: επίσημο prebuilt πακέτο (github releases) + installpkg
-#   2. /etc/sbopkg/sbopkg.conf: BRANCH=15.0|current (με backup)
+#   2. /etc/sbopkg/sbopkg.conf: BRANCH=15.0|current ή REPO_BRANCH= (με backup)
 #   3. σύνδεση με το SBo: sbopkg -r (παράλειψη με --no-sync)
 #   4. sbotools: sbopkg -i sbotools (αν δεν υπάρχει)
 #   5. slpkg: sbopkg -i slpkg (αν δεν υπάρχει)
@@ -174,22 +174,45 @@ else
 fi
 
 # 2) παραμετροποίηση BRANCH στο sbopkg.conf
+# (τα παλιά sbopkg: BRANCH=15.0|current, τα σύγχρονα 0.38.x:
+#  REPO_BRANCH=${REPO_BRANCH:-15.0} - υποστηρίζουμε και τις δύο μορφές)
 if [ -f "$SBOPKG_CONF" ]; then
-	if grep -qE '^BRANCH=' "$SBOPKG_CONF"; then
-		cur_branch=$(sed -n 's/^BRANCH="\?([^"]*)"*/\1/p' "$SBOPKG_CONF" | head -1)
+	BVAR=""
+	if grep -qE '^REPO_BRANCH=' "$SBOPKG_CONF"; then
+		BVAR="REPO_BRANCH"
+	elif grep -qE '^BRANCH=' "$SBOPKG_CONF"; then
+		BVAR="BRANCH"
+	fi
+	if [ -n "$BVAR" ]; then
+		raw=$(grep -E "^$BVAR=" "$SBOPKG_CONF" | head -1 | cut -d= -f2-)
+		raw=${raw//\"/}; raw=${raw//\'/}
+		case "$raw" in
+			'${'*)
+				tmp=${raw#*:-}
+				cur_branch=${tmp%\}}
+				;;
+			*) cur_branch=$raw ;;
+		esac
 		if [ "$cur_branch" != "$SBO_BRANCH" ]; then
 			cp -a "$SBOPKG_CONF" "$SBOPKG_CONF.bak.$ts" 2>/dev/null &&
 				info "backup: $SBOPKG_CONF.bak.$ts"
-			sed -i "s~^BRANCH=.*~BRANCH=\"$SBO_BRANCH\"~" "$SBOPKG_CONF" ||
-				fail "αποτυχία ενημέρωσης BRANCH στο $SBOPKG_CONF"
-			grep -q "BRANCH=\"$SBO_BRANCH\"" "$SBOPKG_CONF" &&
-				info "sbopkg BRANCH → $SBO_BRANCH" ||
-				fail "ο BRANCH δεν ενημερώθηκε σωστά"
+			sed -i "s~^$BVAR=.*~$BVAR=\"$SBO_BRANCH\"~" "$SBOPKG_CONF" ||
+				fail "αποτυχία ενημέρωσης $BVAR στο $SBOPKG_CONF"
+			grep -q "^$BVAR=\"$SBO_BRANCH\"" "$SBOPKG_CONF" &&
+				info "sbopkg $BVAR → $SBO_BRANCH" ||
+				fail "ο $BVAR δεν ενημερώθηκε σωστά"
 		else
-			info "sbopkg BRANCH ήδη $SBO_BRANCH"
+			info "sbopkg $BVAR ήδη $SBO_BRANCH"
 		fi
 	else
-		fail "δεν βρέθηκε γραμμή BRANCH= στο $SBOPKG_CONF"
+		# καμία γνωστή μεταβλητή - προσθήκη REPO_BRANCH (σύγχρονη μορφή)
+		cp -a "$SBOPKG_CONF" "$SBOPKG_CONF.bak.$ts" 2>/dev/null &&
+			info "backup: $SBOPKG_CONF.bak.$ts"
+		printf '\nREPO_BRANCH="%s"\n' "$SBO_BRANCH" >>"$SBOPKG_CONF" ||
+			fail "αποτυχία προσθήκης REPO_BRANCH στο $SBOPKG_CONF"
+		grep -q "^REPO_BRANCH=\"$SBO_BRANCH\"" "$SBOPKG_CONF" &&
+			info "sbopkg REPO_BRANCH → $SBO_BRANCH (προστέθηκε)" ||
+			fail "το REPO_BRANCH δεν προστέθηκε σωστά"
 	fi
 else
 	[ "$failures" -eq 0 ] && fail "δεν βρέθηκε $SBOPKG_CONF (το sbopkg δεν εγκαταστάθηκε;)"

@@ -110,8 +110,8 @@ grep -q "^sbopkg -i slpkg$" "$LOG"
 check "sbopkg -i slpkg" $?
 grep -q 'BRANCH="15.0"' "$CONF"
 check "BRANCH=15.0 στο conf" $?
-ls "$CONF".bak.* >/dev/null 2>&1
-check "backup sbopkg.conf" $?
+ls "$CONF".bak.* >/dev/null 2>&1; [ $? -ne 0 ]
+check "idempotent: χωρίς backup όταν το branch είναι ήδη σωστό" $?
 grep -q 'MAKEFLAGS="-j$(nproc)"' "$PROFD/slackkit-makeflags.sh"
 check "profile.d με MAKEFLAGS -j" $?
 grep -q 'NUMJOBS="-j$(nproc)"' "$PROFD/slackkit-makeflags.sh"
@@ -124,6 +124,8 @@ run -y --current </dev/null >/dev/null 2>&1; rc=$?
 check "exit 0" "$rc"
 grep -q 'BRANCH="current"' "$CONF"
 check "BRANCH=current στο conf" $?
+ls "$CONF".bak.* >/dev/null 2>&1
+check "backup πριν την αλλαγή branch" $?
 
 # ---------------------------------------------------------------- TEST 4 -----
 echo "== TEST 4: ήδη εγκατεστημένα όλα -> τίποτα να κάνει =="
@@ -166,6 +168,26 @@ CCACHE_BIN=ccache-not-installed run -y --stable --ccache </dev/null >/dev/null 2
 check "exit 0" "$rc"
 grep -q "^slackpkg .*install ccache$" "$LOG"
 check "slackpkg install ccache" $?
+
+# ---------------------------------------------------------------- TEST 9 -----
+echo "== TEST 9: σύγχρονο sbopkg.conf με REPO_BRANCH= (0.38.x) =="
+setup
+printf 'REPO_BRANCH=${REPO_BRANCH:-15.0}\nOTHER=x\n' >"$CONF"
+run -y --current --no-sync </dev/null >/dev/null 2>&1; rc=$?
+check "exit 0" "$rc"
+grep -q '^REPO_BRANCH="current"$' "$CONF"
+check "REPO_BRANCH → current" $?
+ls "$CONF".bak.* >/dev/null 2>&1
+check "υπάρχει backup του conf" $?
+
+# ---------------------------------------------------------------- TEST 10 ----
+echo "== TEST 10: conf χωρίς γνωστή μεταβλητή -> προσθήκη REPO_BRANCH =="
+setup
+printf 'OTHER=x\n' >"$CONF"
+run -y --stable --no-sync </dev/null >/dev/null 2>&1; rc=$?
+check "exit 0" "$rc"
+grep -q '^REPO_BRANCH="15.0"$' "$CONF"
+check "REPO_BRANCH προστέθηκε" $?
 
 echo
 echo "== ΣΥΝΟΛΟ: $pass ok, $fail FAIL =="
