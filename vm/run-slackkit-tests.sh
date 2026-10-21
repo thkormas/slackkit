@@ -82,7 +82,7 @@ main() {
 	# 1) mock harnesses (ίδια με στον host - πρέπει να περνάνε και εδώ)
 	step "harness: kernels (50 checks)" bash test_clean_old_kernels.sh
 	step "harness: swappiness (27 checks)" bash test_speedup_swappiness.sh
-	step "harness: grub (30 checks)" bash test_install_grub.sh
+	step "harness: grub (34 checks)" bash test_install_grub.sh
 	step "harness: mirrors (27 checks)" bash test_setup_slackware_mirror.sh
 	step "harness: sbo tools (36 checks)" bash test_install_sbo_tools.sh
 	step "harness: sudo (19 checks)" bash test_enable_sudo.sh

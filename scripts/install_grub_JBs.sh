@@ -11,9 +11,10 @@
 #      findmnt + lsblk (ή --disk /dev/XXX χειροκίνητα)
 #   3. ΕΡΩΤΗΣΗ: δείχνει plan (mode, δίσκος, εντολές) και ρωτάει «Συνέχεια;»
 #   4. Εγκατάσταση:
-#        UEFI : mount /boot/efi (αν χρειάζεται) + grub2-install
+#        UEFI : mount /boot/efi (αν χρειάζεται) + grub-install
 #               --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
-#        BIOS : grub2-install --target=i386-pcbios <disk>
+#        BIOS : grub-install --target=i386-pcbios <disk>
+#      (το όνομα ανιχνεύεται: Slackware → grub-install, άλλες → grub2-install)
 #   5. Ανανέωση grub.cfg (με backup) και επιβεβαίωση ότι υπάρχει menuentry
 #
 # Ασφάλεια:
@@ -143,6 +144,14 @@ if [ -z "$DISK" ]; then
 	DISK=$(detect_disk) || DISK=""
 fi
 
+# --- ανίχνευση ονομάτων grub binaries -------------------------------------------
+# Το Slackware τα ονομάζει grub-install/grub-mkconfig, άλλες διανομές
+# grub2-install/grub2-mkconfig - χρησιμοποιούμε όποιο υπάρχει.
+GRUB_INSTALL=$(command -v grub2-install 2>/dev/null || command -v grub-install 2>/dev/null)
+GRUB_MKCONFIG=$(command -v grub2-mkconfig 2>/dev/null || command -v grub-mkconfig 2>/dev/null)
+GRUB_INSTALL_NAME=$(basename "${GRUB_INSTALL:-grub2-install}")
+GRUB_MKCONFIG_NAME=$(basename "${GRUB_MKCONFIG:-grub2-mkconfig}")
+
 # --- plan ---------------------------------------------------------------------
 
 info "== Εγκατάσταση GRUB (Slackware) =="
@@ -152,15 +161,15 @@ info "δίσκος    : ${DISK:-'(δεν ανιχνεύτηκε)'}"
 if [ "$MODE" = uefi ]; then
 	info "εντολές   :"
 	info "  mount $EFI_MOUNT (αν δεν είναι ήδη mounted)"
-	info "  grub2-install --target=x86_64-efi --efi-directory=$EFI_MOUNT --bootloader-id=$GRUB_EFI_ID --recheck"
-	info "  grub2-mkconfig -o $GRUB_CFG"
+	info "  $GRUB_INSTALL_NAME --target=x86_64-efi --efi-directory=$EFI_MOUNT --bootloader-id=$GRUB_EFI_ID --recheck"
+	info "  $GRUB_MKCONFIG_NAME -o $GRUB_CFG"
 else
 	if [ -z "$DISK" ]; then
 		die "δεν ανιχνεύτηκε δίσκος - δώσε --disk /dev/XXX"
 	fi
 	info "εντολές   :"
-	info "  grub2-install --target=i386-pcbios --recheck $DISK"
-	info "  grub2-mkconfig -o $GRUB_CFG"
+	info "  $GRUB_INSTALL_NAME --target=i386-pcbios --recheck $DISK"
+	info "  $GRUB_MKCONFIG_NAME -o $GRUB_CFG"
 fi
 
 # --- dry-run ------------------------------------------------------------------
@@ -184,8 +193,8 @@ if [ "$ASSUME_YES" -eq 0 ]; then
 	esac
 fi
 
-command -v grub2-install >/dev/null 2>&1 ||
-	die "δεν βρέθηκε grub2-install - εγκατέστησε το πακέτο grub2"
+command -v "$GRUB_INSTALL_NAME" >/dev/null 2>&1 ||
+	die "δεν βρέθηκε grub-install/grub2-install - εγκατέστησε το πακέτο grub"
 
 ts=$(date +%Y%m%d-%H%M%S)
 
@@ -198,35 +207,35 @@ if [ "$MODE" = uefi ]; then
 		fi
 	fi
 
-	if grub2-install --target=x86_64-efi \
+	if "$GRUB_INSTALL" --target=x86_64-efi \
 		"--efi-directory=$EFI_MOUNT" \
 		"--bootloader-id=$GRUB_EFI_ID" --recheck; then
-		info "grub2-install (x86_64-efi) ολοκληρώθηκε"
+		info "$GRUB_INSTALL_NAME (x86_64-efi) ολοκληρώθηκε"
 	else
-		fail "το grub2-install (x86_64-efi) απέτυχε"
+		fail "το $GRUB_INSTALL_NAME (x86_64-efi) απέτυχε"
 	fi
 else
-	if grub2-install --target=i386-pcbios --recheck "$DISK"; then
-		info "grub2-install (i386-pcbios σε $DISK) ολοκληρώθηκε"
+	if "$GRUB_INSTALL" --target=i386-pcbios --recheck "$DISK"; then
+		info "$GRUB_INSTALL_NAME (i386-pcbios σε $DISK) ολοκληρώθηκε"
 	else
-		fail "το grub2-install (i386-pcbios) απέτυχε"
+		fail "το $GRUB_INSTALL_NAME (i386-pcbios) απέτυχε"
 	fi
 fi
 
 # ανανέωση grub.cfg με backup (στατικό config στο Slackware)
-if command -v grub2-mkconfig >/dev/null 2>&1 && [ -f "$GRUB_CFG" ]; then
+if [ -n "$GRUB_MKCONFIG" ] && [ -f "$GRUB_CFG" ]; then
 	cp -a "$GRUB_CFG" "$GRUB_CFG.bak.$ts" 2>/dev/null &&
 		info "backup: $GRUB_CFG.bak.$ts"
 fi
 
-if command -v grub2-mkconfig >/dev/null 2>&1; then
-	if grub2-mkconfig -o "$GRUB_CFG" >/dev/null 2>&1; then
-		info "grub2-mkconfig -> $GRUB_CFG"
+if [ -n "$GRUB_MKCONFIG" ]; then
+	if "$GRUB_MKCONFIG" -o "$GRUB_CFG" >/dev/null 2>&1; then
+		info "$GRUB_MKCONFIG_NAME -> $GRUB_CFG"
 	else
-		fail "το grub2-mkconfig απέτυχε"
+		fail "το $GRUB_MKCONFIG_NAME απέτυχε"
 	fi
 else
-	fail "δεν βρέθηκε grub2-mkconfig"
+	fail "δεν βρέθηκε grub-mkconfig/grub2-mkconfig"
 fi
 
 # --- επιβεβαίωση --------------------------------------------------------------

@@ -2,3 +2,4 @@
 *.log
 test-results.txt
 console-marker.txt
+boot-cache/

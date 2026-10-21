@@ -206,6 +206,43 @@ setup uefi
 STUB_MOUNT_RC=1 run -y >/dev/null 2>&1; rc=$?
 [ "$rc" -ne 0 ]; check "exit != 0 όταν αποτυχάνει το mount" $?
 
+# ---------------------------------------------------------------- TEST 12 ----
+echo "== TEST 12: Slackware ονόματα grub-install/grub-mkconfig =="
+# Το Slackware δεν έχει grub2-* binaries - το script πρέπει να τα βρίσκει
+# από το PATH χωρίς να κάνει lookup σε /usr/sbin του host.
+setup bios
+BIN2="$TMP/bin-sw"
+rm -rf "$BIN2"; mkdir -p "$BIN2"
+# απομόνωση: PATH = ΜΟΝΟ τα stubs (το host μπορεί να έχει πραγματικό
+# grub2-install στο /usr/bin που θα "έκλεβε" την ανίχνευση)
+for f in findmnt lsblk id; do cp "$BIN/$f" "$BIN2/$f"; done
+for f in basename cp date grep mount mountpoint; do cp "$(command -v "$f")" "$BIN2/$f"; done
+cat >"$BIN2/grub-install" <<'EOF'
+#!/bin/bash
+echo "grub-install $*" >>"$STUB_LOG"
+exit "${STUB_GI_RC:-0}"
+EOF
+cat >"$BIN2/grub-mkconfig" <<'EOF'
+#!/bin/bash
+echo "grub-mkconfig $*" >>"$STUB_LOG"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out=$a; prev=$a; done
+[ -n "$out" ] && printf 'menuentry "Slackware"\n' >"$out"
+exit 0
+EOF
+chmod +x "$BIN2"/*
+PATH="$BIN2" STUB_LOG="$LOG" STUB_UID=0 STUB_GI_RC=0 STUB_MOUNT_RC=0 \
+	EFI_SYSFS="$EFI_SYSFS_DIR" BOOT_MOUNT="$BOOT_DIR_MNT" \
+	EFI_MOUNT="$EFI_DIR_MNT" GRUB_CFG="$GRUB_CFG" \
+	/bin/bash "$SCRIPT" -y --bios >/dev/null 2>&1; rc=$?
+check "exit 0" "$rc"
+grep -q "^grub-install --target=i386-pcbios --recheck /dev/sda" "$LOG"
+check "χρησιμοποίησε grub-install (Slackware όνομα)" $?
+grep -q "^grub-mkconfig" "$LOG"
+check "χρησιμοποίησε grub-mkconfig" $?
+grep -q "menuentry" "$GRUB_CFG"
+check "grub.cfg με menuentry" $?
+
 echo
 echo "== ΣΥΝΟΛΟ: $pass ok, $fail FAIL =="
 [ "$fail" -eq 0 ]
