@@ -6,7 +6,8 @@
 #   sh /mnt/slackkit/vm/run-slackkit-tests.sh          # check (ασφαλές, μόνο read/dry-run)
 #   sh /mnt/slackkit/vm/run-slackkit-tests.sh full     # + ΠΡΑΓΜΑΤΙΚΕΣ αλλαγές (disposable live)
 #
-# check  : mock harnesses (44+27 checks) + πραγματικοί dry-run/read-only έλεγχοι
+# check  : mock harnesses (7 suites, 206 checks) + πραγματικοί dry-run/read-only
+#          έλεγχοι (και των 7 scripts)
 # full   : + πραγματικός καθαρισμός πυρήνων (--no-update, χωρίς slackpkg download)
 #          + πραγματική εφαρμογή vm.swappiness=6
 
@@ -79,13 +80,25 @@ main() {
 	cd "$SCRIPTS" || exit 1
 
 	# 1) mock harnesses (ίδια με στον host - πρέπει να περνάνε και εδώ)
-	step "harness: kernels (44 checks)" bash test_clean_old_kernels.sh
+	step "harness: kernels (50 checks)" bash test_clean_old_kernels.sh
 	step "harness: swappiness (27 checks)" bash test_speedup_swappiness.sh
+	step "harness: grub (30 checks)" bash test_install_grub.sh
+	step "harness: mirrors (27 checks)" bash test_setup_slackware_mirror.sh
+	step "harness: sbo tools (30 checks)" bash test_install_sbo_tools.sh
+	step "harness: sudo (19 checks)" bash test_enable_sudo.sh
+	step "harness: gui (23 checks)" bash test_setup_gui.sh
 
 	# 2) ΠΡΑΓΜΑΤΙΚΟΙ read-only έλεγχοι στο live σύστημα
 	step "real: dry-run kernels (read-only)" bash slackware_clean_old_kernels_JBs.sh -n
 	step "real: dry-run swappiness (read-only)" bash speedup_swappiness_JBs.sh -n
 	step "real: swappiness status" bash speedup_swappiness_JBs.sh -s
+	step "real: dry-run grub (read-only)" bash install_grub_JBs.sh -n
+	step "real: dry-run mirror stable (read-only)" \
+		bash setup_slackware_mirror_JBs.sh -n --stable --no-update
+	step "real: dry-run sbo tools (read-only)" \
+		bash install_sbo_tools_JBs.sh -n --stable --no-sync
+	step "real: dry-run sudo (read-only)" bash enable_sudo_JBs.sh -n
+	step "real: dry-run gui (read-only)" bash setup_gui_JBs.sh -n --console
 
 	# 3) πραγματικές αλλαγές (μόνο σε full mode - ζωντανά στο RAM/disposable)
 	if [ "$MODE" = "full" ]; then

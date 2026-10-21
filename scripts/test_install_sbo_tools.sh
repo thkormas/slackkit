@@ -77,6 +77,7 @@ run() {
 	STUB_CURL_RC="${STUB_CURL_RC:-0}" STUB_SBOPKG_RC="${STUB_SBOPKG_RC:-0}" \
 	STUB_INSTPKGS_RC="${STUB_INSTPKGS_RC:-0}" \
 	PACKAGES_DIR="$PKGS" SBOPKG_CONF="$CONF" PROFILE_D="$PROFD" \
+	CCACHE_BIN="${CCACHE_BIN:-ccache}" \
 	bash "$SCRIPT" "$@"
 }
 
@@ -159,7 +160,9 @@ grep -q "curl" "$LOG"; [ $? -ne 0 ]; check "καμία εντολή ως non-roo
 # ---------------------------------------------------------------- TEST 8 -----
 echo "== TEST 8: --ccache τρέχει slackpkg install =="
 setup_installed
-run -y --stable --ccache </dev/null >/dev/null 2>&1; rc=$?
+# Θέλουμε ξεκάθαρο PATH-απόντα ccache binary (υπάρχει σε ορισμένα περιβάλλοντα,
+# π.χ. slackware live) - γι' αυτό δίνουμε ρητά ανύπαρκτο όνομα:
+CCACHE_BIN=ccache-not-installed run -y --stable --ccache </dev/null >/dev/null 2>&1; rc=$?
 check "exit 0" "$rc"
 grep -q "^slackpkg .*install ccache$" "$LOG"
 check "slackpkg install ccache" $?

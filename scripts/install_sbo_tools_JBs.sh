@@ -29,7 +29,7 @@
 #   sudo ./install_sbo_tools_JBs.sh --stable   # χωρίς ερώτηση
 #   ./install_sbo_tools_JBs.sh -n --current    # dry-run
 #
-# (env για δοκιμές: PACKAGES_DIR, SBOPKG_CONF, PROFILE_D, CCACHE_DIR)
+# (env για δοκιμές: PACKAGES_DIR, SBOPKG_CONF, PROFILE_D, CCACHE_DIR, CCACHE_BIN)
 
 set -uo pipefail
 
@@ -39,6 +39,7 @@ PACKAGES_DIR=${PACKAGES_DIR:-/var/log/packages}
 SBOPKG_CONF=${SBOPKG_CONF:-/etc/sbopkg/sbopkg.conf}
 PROFILE_D=${PROFILE_D:-/etc/profile.d}
 CCACHE_DIR=${CCACHE_DIR:-/usr/lib64/ccache}
+CCACHE_BIN=${CCACHE_BIN:-ccache}
 SBOpkg_URL=${SBOPKG_URL:-https://github.com/sbopkg/sbopkg/releases/download/0.38.3/sbopkg-0.38.3-noarch-1_wsr.tgz}
 
 CHOICE=""          # stable | current
@@ -228,7 +229,7 @@ fi
 
 # 5) ccache (προαιρετικά)
 if [ "$DO_CCACHE" -eq 1 ]; then
-	if command -v ccache >/dev/null 2>&1; then
+	if command -v "$CCACHE_BIN" >/dev/null 2>&1; then
 		info "ccache ήδη εγκατεστημένο"
 	elif command -v slackpkg >/dev/null 2>&1; then
 		info "εγκατάσταση ccache μέσω slackpkg..."

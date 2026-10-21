@@ -108,18 +108,35 @@ MODE=$(detect_mode)
 
 detect_disk() {
 	# βρίσκει τον δίσκο-γονέα του /boot (ή του / αν το /boot είναι merged)
-	local src pk
+	local src pk name
 	src=$(findmnt -n -o SOURCE "$BOOT_MOUNT" 2>/dev/null) ||
 		src=$(findmnt -n -o SOURCE / 2>/dev/null) ||
-		return 1
-	pk=$(lsblk -nno pkname "$src" 2>/dev/null | head -1)
-	if [ -n "$pk" ]; then
-		printf '/dev/%s\n' "$pk"
-	elif [ -b "$src" ]; then
-		printf '%s\n' "$src"
-	else
-		return 1
+		src=""
+	if [ -n "$src" ]; then
+		pk=$(lsblk -nno pkname "$src" 2>/dev/null | head -1)
+		if [ -n "$pk" ]; then
+			printf '/dev/%s\n' "$pk"
+			return 0
+		elif [ -b "$src" ]; then
+			printf '%s\n' "$src"
+			return 0
+		fi
 	fi
+	# fallback: σάρωση /sys/block για πραγματικό δίσκο - καλύπτει live
+	# συστήματα (overlay root) και virtio/nvme συσκευές που δεν "κρατά"
+	# το lsblk pkname πάνω από ένα non-block SOURCE.
+	for name in /sys/block/*; do
+		name=$(basename "$name")
+		case "$name" in
+			loop*|ram*|zram*|fd*|sr*|dm-*|md*) continue ;;
+			sd*|hd*|vd*|xvd*|nvme*|mmcblk*) ;;
+			*) continue ;;
+		esac
+		[ -b "/dev/$name" ] || continue
+		printf '/dev/%s\n' "$name"
+		return 0
+	done
+	return 1
 }
 
 if [ -z "$DISK" ]; then
